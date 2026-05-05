@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bibs
 
-## Getting Started
+Suivi de biberons ultra-simple, déployable sur Vercel + Supabase.
 
-First, run the development server:
+> Spec et workflow détaillés dans `CLAUDE.md`.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Setup local
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Cloner et installer :
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+   ```bash
+   pnpm install
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. Créer un projet Supabase, ouvrir le SQL editor, copier-coller le contenu de `supabase/schema.sql` et l'exécuter.
 
-## Learn More
+3. Récupérer dans Supabase → Project Settings → API :
+   - `Project URL`
+   - `anon public` key
 
-To learn more about Next.js, take a look at the following resources:
+4. Copier `.env.local.example` en `.env.local` et remplir :
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. Lancer :
 
-## Deploy on Vercel
+   ```bash
+   pnpm dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   Ouvre http://localhost:3000.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scripts
+
+- `pnpm dev` — serveur de dev
+- `pnpm build` — build production
+- `pnpm start` — sert le build production
+- `pnpm test` — tests Vitest (logique 6h-6h, totaux, 7 jours)
+- `pnpm typecheck` — `tsc --noEmit`
+
+## Déploiement Vercel
+
+1. Pousser le repo sur GitHub.
+2. Sur Vercel : Import → choisir le repo.
+3. Dans Environment Variables, ajouter `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+4. Deploy. Le service worker n'est actif qu'en production.
+
+## Architecture
+
+- `app/` — pages App Router (Aujourd'hui, Historique, Stats) + manifest et icônes générés.
+- `components/` — UI React (BottleSheet, BottleSlider, BottomNav, ConfirmDialog, BottlesProvider, SwRegistrar).
+- `lib/day.ts` — logique 6h-6h, totaux, regroupement, série 7 jours. Couvert par Vitest.
+- `lib/bottles.ts` — CRUD Supabase. Si network error, enfile dans la queue offline.
+- `lib/offlineQueue.ts` — IndexedDB. Drain auto au retour de connexion.
+- `public/sw.js` — service worker minimal pour cache shell.
+- `supabase/schema.sql` — table `bottles` + RLS permissives.
+
+## Notes de sécurité
+
+L'URL Vercel est publique : qui a le lien peut lire et écrire. C'est assumé pour la v1. Pour durcir : remplacer la politique RLS par une politique conditionnée à un cookie/header partagé, ou mettre l'app derrière Vercel Authentication.
