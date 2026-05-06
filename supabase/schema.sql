@@ -30,7 +30,7 @@ create trigger bottles_set_updated_at
   before update on public.bottles
   for each row execute function public.bottles_set_updated_at();
 
--- RLS : URL publique côté client. Politiques permissives accept�es par le projet.
+-- RLS : URL publique côté client. Politiques permissives acceptées par le projet.
 alter table public.bottles enable row level security;
 
 drop policy if exists "bottles_anon_all" on public.bottles;
