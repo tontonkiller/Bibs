@@ -1,7 +1,7 @@
 "use client";
 
 import { getSupabase } from "./supabase";
-import type { Baby, BabyEdit, NewBaby } from "./types";
+import type { Baby, NewBaby } from "./types";
 
 const TABLE = "babies";
 
@@ -26,22 +26,40 @@ export async function createBaby(input: NewBaby): Promise<string> {
   return data as string;
 }
 
-export async function updateBaby(id: string, patch: BabyEdit): Promise<void> {
+export async function verifyBabyPassword(
+  babyId: string,
+  password: string,
+): Promise<boolean> {
   const sb = getSupabase();
-  const { error } = await sb.from(TABLE).update(patch).eq("id", id);
-  if (error) throw error;
-}
-
-export async function updateBabyPassword(
-  id: string,
-  newPassword: string,
-): Promise<void> {
-  const sb = getSupabase();
-  const { error } = await sb.rpc("update_baby_password", {
-    p_baby_id: id,
-    p_new_password: newPassword,
+  const { data, error } = await sb.rpc("verify_baby_password", {
+    p_baby_id: babyId,
+    p_password: password,
   });
   if (error) throw error;
+  return Boolean(data);
+}
+
+export type UpdateBabyChanges = {
+  name?: string;
+  birthdate?: string;
+  newPassword?: string;
+};
+
+export async function updateBaby(
+  babyId: string,
+  currentPassword: string,
+  changes: UpdateBabyChanges,
+): Promise<boolean> {
+  const sb = getSupabase();
+  const { data, error } = await sb.rpc("update_baby", {
+    p_baby_id: babyId,
+    p_current_password: currentPassword,
+    p_name: changes.name ?? null,
+    p_birthdate: changes.birthdate ?? null,
+    p_new_password: changes.newPassword ?? null,
+  });
+  if (error) throw error;
+  return Boolean(data);
 }
 
 export async function deleteBaby(
