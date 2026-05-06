@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { BottomNav } from "@/components/BottomNav";
+import { AppShell } from "@/components/AppShell";
+import { BabyProvider } from "@/components/BabyProvider";
 import { BottlesProvider } from "@/components/BottlesProvider";
 import { SwRegistrar } from "@/components/SwRegistrar";
 
@@ -27,10 +28,11 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="min-h-dvh">
-        <BottlesProvider>
-          <main className="mx-auto max-w-md px-4 pt-6 pb-28">{children}</main>
-          <BottomNav />
-        </BottlesProvider>
+        <BabyProvider>
+          <BottlesProvider>
+            <AppShell>{children}</AppShell>
+          </BottlesProvider>
+        </BabyProvider>
         <SwRegistrar />
       </body>
     </html>

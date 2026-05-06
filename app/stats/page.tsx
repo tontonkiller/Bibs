@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { BabyMenu } from "@/components/BabyMenu";
 import { useBottles } from "@/components/BottlesProvider";
 import { last7Days } from "@/lib/day";
 import { getDeviceTz } from "@/lib/format";
@@ -50,10 +51,11 @@ export default function StatsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
+      <header className="flex items-center justify-between gap-3">
         <h1 className="text-sm font-medium uppercase tracking-wide text-(--color-ink-soft)">
           Stats — 7 derniers jours
         </h1>
+        <BabyMenu />
       </header>
 
       <section className="rounded-3xl bg-(--color-surface) p-4 shadow-sm">

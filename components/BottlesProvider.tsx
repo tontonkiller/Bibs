@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useBaby } from "./BabyProvider";
 import {
   createBottle,
   listBottles,
@@ -14,7 +15,7 @@ import {
   updateBottle,
 } from "@/lib/bottles";
 import { drainQueue, pendingCount } from "@/lib/offlineQueue";
-import type { Bottle, BottlePatch, NewBottle } from "@/lib/types";
+import type { Bottle, BottleInput, BottlePatch } from "@/lib/types";
 
 type Ctx = {
   bottles: Bottle[];
@@ -22,7 +23,7 @@ type Ctx = {
   error: string | null;
   pending: number;
   refresh: () => Promise<void>;
-  add: (input: NewBottle) => Promise<void>;
+  add: (input: BottleInput) => Promise<void>;
   edit: (id: string, patch: BottlePatch) => Promise<void>;
   remove: (id: string) => Promise<void>;
 };
@@ -30,15 +31,22 @@ type Ctx = {
 const BottlesContext = createContext<Ctx | null>(null);
 
 export function BottlesProvider({ children }: { children: React.ReactNode }) {
+  const { current } = useBaby();
+  const babyId = current?.id ?? null;
   const [bottles, setBottles] = useState<Bottle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
 
   const refresh = useCallback(async () => {
+    if (!babyId) {
+      setBottles([]);
+      setLoading(false);
+      return;
+    }
     try {
       setError(null);
-      const list = await listBottles();
+      const list = await listBottles(babyId);
       setBottles(list);
     } catch (e) {
       setError(
@@ -48,7 +56,7 @@ export function BottlesProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       setPending(await pendingCount());
     }
-  }, []);
+  }, [babyId]);
 
   useEffect(() => {
     refresh();
@@ -65,8 +73,9 @@ export function BottlesProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const add = useCallback(
-    async (input: NewBottle) => {
-      const created = await createBottle(input);
+    async (input: BottleInput) => {
+      if (!babyId) throw new Error("Aucun bébé sélectionné.");
+      const created = await createBottle({ ...input, baby_id: babyId });
       if (created) {
         setBottles((prev) =>
           [created, ...prev].sort((a, b) =>
@@ -76,23 +85,20 @@ export function BottlesProvider({ children }: { children: React.ReactNode }) {
       }
       setPending(await pendingCount());
     },
-    [],
+    [babyId],
   );
 
-  const edit = useCallback(
-    async (id: string, patch: BottlePatch) => {
-      const updated = await updateBottle(id, patch);
-      if (updated) {
-        setBottles((prev) =>
-          prev
-            .map((b) => (b.id === id ? updated : b))
-            .sort((a, b) => b.drunk_at.localeCompare(a.drunk_at)),
-        );
-      }
-      setPending(await pendingCount());
-    },
-    [],
-  );
+  const edit = useCallback(async (id: string, patch: BottlePatch) => {
+    const updated = await updateBottle(id, patch);
+    if (updated) {
+      setBottles((prev) =>
+        prev
+          .map((b) => (b.id === id ? updated : b))
+          .sort((a, b) => b.drunk_at.localeCompare(a.drunk_at)),
+      );
+    }
+    setPending(await pendingCount());
+  }, []);
 
   const remove = useCallback(async (id: string) => {
     await removeBottle(id);
