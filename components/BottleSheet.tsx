@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { BottleSlider } from "./BottleSlider";
+import { DurationSlider } from "./DurationSlider";
+import { KindToggle } from "./KindToggle";
 import { TimeField } from "./TimeField";
 import { fromLocalInputValue, toLocalInputValue } from "@/lib/format";
-import type { Bottle, NewBottle } from "@/lib/types";
+import type { Bottle, FeedKind, NewBottle } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -15,18 +17,24 @@ type Props = {
 };
 
 export function BottleSheet({ open, initial, onClose, onSave, saving }: Props) {
+  const [kind, setKind] = useState<FeedKind>("formula");
   const [amount, setAmount] = useState(90);
+  const [duration, setDuration] = useState(15);
   const [time, setTime] = useState("");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     if (!open) return;
     if (initial) {
-      setAmount(initial.amount_ml);
+      setKind(initial.kind);
+      setAmount(initial.amount_ml ?? 90);
+      setDuration(initial.duration_min ?? 15);
       setTime(toLocalInputValue(new Date(initial.drunk_at)));
       setNote(initial.note ?? "");
     } else {
+      setKind("formula");
       setAmount(90);
+      setDuration(15);
       setTime(toLocalInputValue(new Date()));
       setNote("");
     }
@@ -34,13 +42,14 @@ export function BottleSheet({ open, initial, onClose, onSave, saving }: Props) {
 
   if (!open) return null;
 
+  const isBreast = kind === "breast";
+  const title = initial ? "Modifier" : "Nouveau biberon";
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 sm:items-center">
       <div className="w-full max-w-md rounded-t-3xl bg-(--color-surface) p-6 shadow-xl sm:rounded-3xl">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            {initial ? "Modifier le biberon" : "Nouveau biberon"}
-          </h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{title}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -51,8 +60,14 @@ export function BottleSheet({ open, initial, onClose, onSave, saving }: Props) {
           </button>
         </div>
 
-        <div className="mt-4">
-          <BottleSlider value={amount} onChange={setAmount} />
+        <KindToggle value={kind} onChange={setKind} />
+
+        <div className="mt-5">
+          {isBreast ? (
+            <DurationSlider value={duration} onChange={setDuration} />
+          ) : (
+            <BottleSlider value={amount} onChange={setAmount} />
+          )}
         </div>
 
         <div className="mt-6 flex flex-col gap-4">
@@ -76,7 +91,9 @@ export function BottleSheet({ open, initial, onClose, onSave, saving }: Props) {
           disabled={saving || !time}
           onClick={() =>
             onSave({
-              amount_ml: amount,
+              kind,
+              amount_ml: isBreast ? null : amount,
+              duration_min: isBreast ? duration : null,
               drunk_at: fromLocalInputValue(time),
               note: note.trim() || null,
             })

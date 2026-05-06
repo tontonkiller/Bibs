@@ -27,7 +27,6 @@ function zonedParts(date: Date, tz: string): ZonedParts {
     year: get("year"),
     month: get("month"),
     day: get("day"),
-    // hour can be "24" in some runtimes; normalize.
     hour: get("hour") % 24,
     minute: get("minute"),
   };
@@ -43,11 +42,7 @@ function isoDate(year: number, month: number, day: number): string {
   );
 }
 
-function shiftDate(year: number, month: number, day: number, deltaDays: number): {
-  year: number;
-  month: number;
-  day: number;
-} {
+function shiftDate(year: number, month: number, day: number, deltaDays: number) {
   const d = new Date(Date.UTC(year, month - 1, day));
   d.setUTCDate(d.getUTCDate() + deltaDays);
   return {
@@ -67,21 +62,27 @@ export function dayBucket(date: Date | string, tz: string): string {
   return isoDate(year, month, day);
 }
 
-export function totalForDay(
+export type DayTotals = { ml: number; min: number };
+
+export function dayTotals(
   bottles: Bottle[],
   day: string,
   tz: string,
-): number {
-  let total = 0;
+): DayTotals {
+  let ml = 0;
+  let min = 0;
   for (const b of bottles) {
-    if (dayBucket(b.drunk_at, tz) === day) total += b.amount_ml;
+    if (dayBucket(b.drunk_at, tz) !== day) continue;
+    if (b.amount_ml != null) ml += b.amount_ml;
+    if (b.duration_min != null) min += b.duration_min;
   }
-  return total;
+  return { ml, min };
 }
 
 export type DayGroup = {
   day: string;
   totalMl: number;
+  totalMin: number;
   bottles: Bottle[];
 };
 
@@ -96,18 +97,25 @@ export function groupByDay(bottles: Bottle[], tz: string): DayGroup[] {
   const groups: DayGroup[] = [];
   for (const [day, list] of map) {
     list.sort((a, b) => b.drunk_at.localeCompare(a.drunk_at));
-    const totalMl = list.reduce((s, b) => s + b.amount_ml, 0);
-    groups.push({ day, totalMl, bottles: list });
+    let totalMl = 0;
+    let totalMin = 0;
+    for (const b of list) {
+      if (b.amount_ml != null) totalMl += b.amount_ml;
+      if (b.duration_min != null) totalMin += b.duration_min;
+    }
+    groups.push({ day, totalMl, totalMin, bottles: list });
   }
   groups.sort((a, b) => b.day.localeCompare(a.day));
   return groups;
 }
 
+export type DaySeriesPoint = { day: string; ml: number; min: number };
+
 export function last7Days(
   bottles: Bottle[],
   today: Date,
   tz: string,
-): { day: string; totalMl: number }[] {
+): DaySeriesPoint[] {
   const todayBucket = dayBucket(today, tz);
   const [y, m, d] = todayBucket.split("-").map((s) => parseInt(s, 10));
   const days: string[] = [];
@@ -115,10 +123,18 @@ export function last7Days(
     const shifted = shiftDate(y, m, d, -i);
     days.push(isoDate(shifted.year, shifted.month, shifted.day));
   }
-  const totals = new Map(days.map((day) => [day, 0]));
+  const totals = new Map<string, DayTotals>(
+    days.map((day) => [day, { ml: 0, min: 0 }]),
+  );
   for (const b of bottles) {
     const key = dayBucket(b.drunk_at, tz);
-    if (totals.has(key)) totals.set(key, totals.get(key)! + b.amount_ml);
+    const t = totals.get(key);
+    if (!t) continue;
+    if (b.amount_ml != null) t.ml += b.amount_ml;
+    if (b.duration_min != null) t.min += b.duration_min;
   }
-  return days.map((day) => ({ day, totalMl: totals.get(day) ?? 0 }));
+  return days.map((day) => {
+    const t = totals.get(day)!;
+    return { day, ml: t.ml, min: t.min };
+  });
 }

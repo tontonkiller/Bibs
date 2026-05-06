@@ -24,7 +24,9 @@ export async function createBottle(input: NewBottle): Promise<Bottle | null> {
       .from(TABLE)
       .insert({
         drunk_at: input.drunk_at,
+        kind: input.kind,
         amount_ml: input.amount_ml,
+        duration_min: input.duration_min,
         note: input.note ?? null,
       })
       .select()

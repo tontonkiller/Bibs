@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -23,6 +24,9 @@ function shortLabel(dayKey: string): string {
   return wd.charAt(0).toUpperCase() + wd.slice(1);
 }
 
+const COLOR_ML = "#f4a8b3";
+const COLOR_MIN = "#92c1f2";
+
 export default function StatsPage() {
   const { bottles, loading } = useBottles();
   const tz = getDeviceTz();
@@ -32,12 +36,17 @@ export default function StatsPage() {
     return series.map((d) => ({
       day: d.day,
       label: shortLabel(d.day),
-      ml: d.totalMl,
+      ml: d.ml,
+      min: d.min,
     }));
   }, [bottles, tz]);
 
-  const weekTotal = data.reduce((s, d) => s + d.ml, 0);
-  const avg = Math.round(weekTotal / 7);
+  const totals = data.reduce(
+    (acc, d) => ({ ml: acc.ml + d.ml, min: acc.min + d.min }),
+    { ml: 0, min: 0 },
+  );
+  const avgMl = Math.round(totals.ml / 7);
+  const avgMin = Math.round(totals.min / 7);
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,14 +60,23 @@ export default function StatsPage() {
         <div className="flex items-baseline justify-between px-2 pb-3">
           <div>
             <div className="text-2xl font-bold tabular-nums">
-              {avg} <span className="text-base font-normal text-(--color-ink-soft)">ml/jour</span>
+              {avgMl}{" "}
+              <span className="text-base font-normal text-(--color-ink-soft)">
+                ml/jour
+              </span>
             </div>
-            <div className="text-xs text-(--color-ink-soft)">
+            {totals.min > 0 && (
+              <div className="text-sm tabular-nums text-(--color-ink-soft)">
+                + {avgMin} min/jour de tétée
+              </div>
+            )}
+            <div className="mt-1 text-xs text-(--color-ink-soft)">
               Moyenne sur 7 jours
             </div>
           </div>
           <div className="text-right text-xs text-(--color-ink-soft)">
-            Total : {weekTotal} ml
+            <div>Total : {totals.ml} ml</div>
+            {totals.min > 0 && <div>{totals.min} min</div>}
           </div>
         </div>
         <div className="h-64">
@@ -66,8 +84,15 @@ export default function StatsPage() {
             <p className="text-sm text-(--color-ink-soft)">Chargement…</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -10 }}>
-                <CartesianGrid stroke="#ece1eb" strokeDasharray="3 3" vertical={false} />
+              <BarChart
+                data={data}
+                margin={{ top: 8, right: 8, bottom: 0, left: -10 }}
+              >
+                <CartesianGrid
+                  stroke="#ece1eb"
+                  strokeDasharray="3 3"
+                  vertical={false}
+                />
                 <XAxis
                   dataKey="label"
                   tick={{ fontSize: 12, fill: "#6b5e72" }}
@@ -75,10 +100,19 @@ export default function StatsPage() {
                   tickLine={false}
                 />
                 <YAxis
+                  yAxisId="ml"
                   tick={{ fontSize: 11, fill: "#6b5e72" }}
                   axisLine={false}
                   tickLine={false}
                   width={36}
+                />
+                <YAxis
+                  yAxisId="min"
+                  orientation="right"
+                  tick={{ fontSize: 11, fill: "#6b5e72" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={28}
                 />
                 <Tooltip
                   cursor={{ fill: "#fde2e640" }}
@@ -87,11 +121,26 @@ export default function StatsPage() {
                     border: "1px solid #ece1eb",
                     background: "#fff",
                   }}
-                  formatter={(v) => [`${v as number} ml`, "Total"]}
+                  formatter={(v, name) => {
+                    const unit = name === "min" ? "min" : "ml";
+                    const label = name === "min" ? "Tétée" : "Biberons";
+                    return [`${v as number} ${unit}`, label];
+                  }}
+                />
+                <Legend
+                  formatter={(value) => (value === "min" ? "Tétée (min)" : "Biberons (ml)")}
+                  wrapperStyle={{ fontSize: 12 }}
                 />
                 <Bar
+                  yAxisId="ml"
                   dataKey="ml"
-                  fill="#f4a8b3"
+                  fill={COLOR_ML}
+                  radius={[8, 8, 0, 0]}
+                />
+                <Bar
+                  yAxisId="min"
+                  dataKey="min"
+                  fill={COLOR_MIN}
                   radius={[8, 8, 0, 0]}
                 />
               </BarChart>

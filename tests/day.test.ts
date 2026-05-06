@@ -1,19 +1,33 @@
 import { describe, it, expect } from "vitest";
 import {
   dayBucket,
-  totalForDay,
+  dayTotals,
   groupByDay,
   last7Days,
 } from "../lib/day";
-import type { Bottle } from "../lib/types";
+import type { Bottle, FeedKind } from "../lib/types";
 
 const TZ_MTL = "America/Montreal";
 
-function bottle(drunkAtIso: string, amount = 90, id = drunkAtIso): Bottle {
+type BottleOpts = {
+  amount?: number | null;
+  duration?: number | null;
+  kind?: FeedKind;
+  id?: string;
+};
+
+function bottle(drunkAtIso: string, opts: BottleOpts = {}): Bottle {
+  const kind = opts.kind ?? "formula";
+  const amount =
+    opts.amount === undefined ? (kind === "breast" ? null : 90) : opts.amount;
+  const duration =
+    opts.duration === undefined ? (kind === "breast" ? 15 : null) : opts.duration;
   return {
-    id,
+    id: opts.id ?? drunkAtIso,
     drunk_at: drunkAtIso,
+    kind,
     amount_ml: amount,
+    duration_min: duration,
     note: null,
     created_at: drunkAtIso,
     updated_at: drunkAtIso,
@@ -22,12 +36,10 @@ function bottle(drunkAtIso: string, amount = 90, id = drunkAtIso): Bottle {
 
 describe("dayBucket (6h-6h boundary)", () => {
   it("biberon à 02h30 locale → compte pour la veille", () => {
-    // 02h30 EST le 5 mai 2024 = 06h30 UTC (EDT, UTC-4)
     expect(dayBucket("2024-05-05T06:30:00Z", TZ_MTL)).toBe("2024-05-04");
   });
 
   it("biberon à 06h00 pile locale → nouveau jour", () => {
-    // 06h00 EDT le 5 mai 2024 = 10h00 UTC
     expect(dayBucket("2024-05-05T10:00:00Z", TZ_MTL)).toBe("2024-05-05");
   });
 
@@ -36,7 +48,6 @@ describe("dayBucket (6h-6h boundary)", () => {
   });
 
   it("biberon à 23h59 locale → jour en cours", () => {
-    // 23h59 EDT le 5 mai 2024 = 03h59 UTC le 6 mai
     expect(dayBucket("2024-05-06T03:59:00Z", TZ_MTL)).toBe("2024-05-05");
   });
 
@@ -45,14 +56,10 @@ describe("dayBucket (6h-6h boundary)", () => {
   });
 
   it("DST printemps : 04h00 EDT le dimanche du changement → veille", () => {
-    // Dim 10 mars 2024, à 02h00 EST le clock saute à 03h00 EDT.
-    // 04h00 EDT le 10 mars = 08h00 UTC.
     expect(dayBucket("2024-03-10T08:00:00Z", TZ_MTL)).toBe("2024-03-09");
   });
 
   it("DST automne : 01h30 EDT (avant bascule) le dimanche → veille", () => {
-    // Dim 3 nov 2024, à 02h00 EDT clock recule à 01h00 EST.
-    // 01h30 EDT le 3 nov = 05h30 UTC. Heure locale < 06h → veille.
     expect(dayBucket("2024-11-03T05:30:00Z", TZ_MTL)).toBe("2024-11-02");
   });
 
@@ -62,35 +69,53 @@ describe("dayBucket (6h-6h boundary)", () => {
   });
 });
 
-describe("totalForDay", () => {
-  it("somme uniquement les biberons de la journée 6h-6h", () => {
+describe("dayTotals (ml + min séparés)", () => {
+  it("formula et pumped contribuent aux ml ; breast contribue aux min", () => {
     const bottles: Bottle[] = [
-      bottle("2024-05-05T03:00:00Z", 60), // 23h00 EDT le 4 → bucket 2024-05-04
-      bottle("2024-05-05T16:00:00Z", 90), // 12h00 EDT le 5 → bucket 2024-05-05
-      bottle("2024-05-06T03:00:00Z", 80), // 23h00 EDT le 5 → bucket 2024-05-05
-      bottle("2024-05-06T08:00:00Z", 50), // 04h00 EDT le 6 → bucket 2024-05-05
-      bottle("2024-05-06T16:00:00Z", 70), // 12h00 EDT le 6 → bucket 2024-05-06
+      bottle("2024-05-05T16:00:00Z", { kind: "formula", amount: 90 }),
+      bottle("2024-05-05T20:00:00Z", { kind: "pumped", amount: 80 }),
+      bottle("2024-05-06T01:00:00Z", { kind: "breast", duration: 20 }),
+      bottle("2024-05-06T03:00:00Z", { kind: "breast", duration: 15 }),
     ];
-    expect(totalForDay(bottles, "2024-05-05", TZ_MTL)).toBe(90 + 80 + 50);
+    expect(dayTotals(bottles, "2024-05-05", TZ_MTL)).toEqual({
+      ml: 90 + 80,
+      min: 20 + 15,
+    });
   });
 
-  it("retourne 0 si aucun biberon ce jour-là", () => {
-    expect(totalForDay([], "2024-05-05", TZ_MTL)).toBe(0);
+  it("ne compte pas les biberons hors de la journée 6h-6h", () => {
+    const bottles: Bottle[] = [
+      bottle("2024-05-05T03:00:00Z", { kind: "formula", amount: 60 }), // veille
+      bottle("2024-05-05T16:00:00Z", { kind: "formula", amount: 90 }),
+      bottle("2024-05-06T16:00:00Z", { kind: "formula", amount: 70 }), // lendemain
+    ];
+    expect(dayTotals(bottles, "2024-05-05", TZ_MTL).ml).toBe(90);
+  });
+
+  it("amount_ml null sur breast n'écroule pas la somme", () => {
+    const bottles: Bottle[] = [
+      bottle("2024-05-05T16:00:00Z", { kind: "breast", duration: 25 }),
+    ];
+    expect(dayTotals(bottles, "2024-05-05", TZ_MTL)).toEqual({ ml: 0, min: 25 });
+  });
+
+  it("liste vide → totaux 0/0", () => {
+    expect(dayTotals([], "2024-05-05", TZ_MTL)).toEqual({ ml: 0, min: 0 });
   });
 });
 
 describe("groupByDay", () => {
-  it("regroupe par bucket 6h-6h, du plus récent au plus ancien", () => {
+  it("regroupe par bucket 6h-6h, ml et min totaux par jour, ordre desc", () => {
     const bottles: Bottle[] = [
-      bottle("2024-05-05T16:00:00Z", 90, "a"), // bucket 2024-05-05
-      bottle("2024-05-06T08:00:00Z", 50, "b"), // bucket 2024-05-05
-      bottle("2024-05-06T16:00:00Z", 70, "c"), // bucket 2024-05-06
+      bottle("2024-05-05T16:00:00Z", { kind: "formula", amount: 90, id: "a" }),
+      bottle("2024-05-06T08:00:00Z", { kind: "breast", duration: 20, id: "b" }), // 04h EDT le 6 → bucket 2024-05-05
+      bottle("2024-05-06T16:00:00Z", { kind: "pumped", amount: 70, id: "c" }),
     ];
     const groups = groupByDay(bottles, TZ_MTL);
     expect(groups.map((g) => g.day)).toEqual(["2024-05-06", "2024-05-05"]);
-    expect(groups[0].bottles.map((b) => b.id)).toEqual(["c"]);
+    expect(groups[0]).toMatchObject({ totalMl: 70, totalMin: 0 });
+    expect(groups[1]).toMatchObject({ totalMl: 90, totalMin: 20 });
     expect(groups[1].bottles.map((b) => b.id)).toEqual(["b", "a"]);
-    expect(groups[1].totalMl).toBe(140);
   });
 
   it("liste vide → tableau vide", () => {
@@ -99,15 +124,14 @@ describe("groupByDay", () => {
 });
 
 describe("last7Days", () => {
-  it("retourne 7 entrées du plus ancien au plus récent, totaux par jour", () => {
-    // "Aujourd'hui" = 2024-05-05 12h00 EDT
+  it("retourne 7 entrées avec ml et min par jour", () => {
     const today = new Date("2024-05-05T16:00:00Z");
     const bottles: Bottle[] = [
-      bottle("2024-05-05T16:00:00Z", 90), // bucket 2024-05-05
-      bottle("2024-05-06T05:00:00Z", 60), // 01h00 EDT le 6 → bucket 2024-05-05
-      bottle("2024-05-04T18:00:00Z", 80), // bucket 2024-05-04
-      bottle("2024-04-29T18:00:00Z", 50), // bucket 2024-04-29 (dans la fenêtre)
-      bottle("2024-04-28T18:00:00Z", 30), // bucket 2024-04-28 (HORS fenêtre)
+      bottle("2024-05-05T16:00:00Z", { kind: "formula", amount: 90 }),
+      bottle("2024-05-06T05:00:00Z", { kind: "breast", duration: 18 }), // 01h EDT le 6 → bucket 2024-05-05
+      bottle("2024-05-04T18:00:00Z", { kind: "pumped", amount: 80 }),
+      bottle("2024-04-29T18:00:00Z", { kind: "formula", amount: 50 }),
+      bottle("2024-04-28T18:00:00Z", { kind: "formula", amount: 30 }), // hors fenêtre
     ];
     const series = last7Days(bottles, today, TZ_MTL);
     expect(series).toHaveLength(7);
@@ -120,15 +144,15 @@ describe("last7Days", () => {
       "2024-05-04",
       "2024-05-05",
     ]);
-    expect(series[0].totalMl).toBe(50);
-    expect(series[5].totalMl).toBe(80);
-    expect(series[6].totalMl).toBe(150);
+    expect(series[0]).toEqual({ day: "2024-04-29", ml: 50, min: 0 });
+    expect(series[5]).toEqual({ day: "2024-05-04", ml: 80, min: 0 });
+    expect(series[6]).toEqual({ day: "2024-05-05", ml: 90, min: 18 });
   });
 
-  it("aucun biberon → 7 jours à 0", () => {
+  it("aucun biberon → 7 jours à 0/0", () => {
     const today = new Date("2024-05-05T16:00:00Z");
     const series = last7Days([], today, TZ_MTL);
     expect(series).toHaveLength(7);
-    expect(series.every((d) => d.totalMl === 0)).toBe(true);
+    expect(series.every((d) => d.ml === 0 && d.min === 0)).toBe(true);
   });
 });
