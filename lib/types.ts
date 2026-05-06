@@ -14,11 +14,6 @@ export type NewBaby = {
   password: string;
 };
 
-export type BabyEdit = {
-  name?: string;
-  birthdate?: string;
-};
-
 export type Bottle = {
   id: string;
   baby_id: string;

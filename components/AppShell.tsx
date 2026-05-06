@@ -2,10 +2,11 @@
 
 import { useBaby } from "./BabyProvider";
 import { BottomNav } from "./BottomNav";
+import { SelectBaby } from "./SelectBaby";
 import { Welcome } from "./Welcome";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { babies, loading, error } = useBaby();
+  const { babies, current, loading, error } = useBaby();
 
   if (loading) {
     return (
@@ -27,6 +28,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (babies.length === 0) {
     return <Welcome />;
+  }
+
+  if (!current) {
+    return <SelectBaby />;
   }
 
   return (

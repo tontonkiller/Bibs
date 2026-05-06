@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useBaby } from "./BabyProvider";
 import { BabyForm } from "./BabyForm";
 import { DeleteBabyDialog } from "./DeleteBabyDialog";
-import type { Baby, BabyEdit, NewBaby } from "@/lib/types";
+import { UnlockBabyDialog } from "./UnlockBabyDialog";
+import type { Baby, NewBaby } from "@/lib/types";
+import type { UpdateBabyChanges } from "@/lib/babies";
 
 type Mode =
   | { kind: "list" }
@@ -12,12 +14,13 @@ type Mode =
   | { kind: "edit"; baby: Baby };
 
 export function BabyMenu() {
-  const { babies, current, select, create, edit, changePassword, remove } =
+  const { babies, current, unlocked, select, unlock, create, edit, remove } =
     useBaby();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>({ kind: "list" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toUnlock, setToUnlock] = useState<Baby | null>(null);
   const [toDelete, setToDelete] = useState<Baby | null>(null);
 
   function openSheet() {
@@ -46,21 +49,39 @@ export function BabyMenu() {
   }
 
   async function handleEdit(
-    patch: BabyEdit,
-    pwd: { newPassword: string } | null,
-  ) {
-    if (mode.kind !== "edit") return;
+    currentPassword: string,
+    changes: UpdateBabyChanges,
+  ): Promise<boolean> {
+    if (mode.kind !== "edit") return false;
     setSubmitting(true);
     setError(null);
     try {
-      if (Object.keys(patch).length > 0) await edit(mode.baby.id, patch);
-      if (pwd) await changePassword(mode.baby.id, pwd.newPassword);
-      setMode({ kind: "list" });
+      const ok = await edit(mode.baby.id, currentPassword, changes);
+      if (ok) setMode({ kind: "list" });
+      return ok;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Modification impossible.");
+      return false;
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function tapBaby(b: Baby) {
+    if (unlocked.has(b.id)) {
+      select(b.id);
+      close();
+    } else {
+      setToUnlock(b);
+    }
+  }
+
+  function tapEdit(b: Baby) {
+    if (!unlocked.has(b.id)) {
+      setToUnlock(b);
+      return;
+    }
+    setMode({ kind: "edit", baby: b });
   }
 
   return (
@@ -108,6 +129,7 @@ export function BabyMenu() {
               <div className="flex flex-col gap-2">
                 {babies.map((b) => {
                   const active = current?.id === b.id;
+                  const isUnlocked = unlocked.has(b.id);
                   return (
                     <div
                       key={b.id}
@@ -119,14 +141,16 @@ export function BabyMenu() {
                     >
                       <button
                         type="button"
-                        onClick={() => {
-                          select(b.id);
-                          close();
-                        }}
+                        onClick={() => tapBaby(b)}
                         className="flex-1 text-left"
                       >
-                        <div className="font-medium text-(--color-ink)">
+                        <div className="flex items-center gap-2 font-medium text-(--color-ink)">
                           {b.name}
+                          {!isUnlocked && (
+                            <span aria-label="Verrouillé" title="Verrouillé">
+                              🔒
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-(--color-ink-soft)">
                           Né(e) le {b.birthdate}
@@ -134,7 +158,7 @@ export function BabyMenu() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setMode({ kind: "edit", baby: b })}
+                        onClick={() => tapEdit(b)}
                         className="rounded-full p-2 text-(--color-ink-soft) hover:bg-(--color-rose)/40"
                         aria-label="Modifier"
                       >
@@ -182,6 +206,20 @@ export function BabyMenu() {
           </div>
         </div>
       )}
+
+      <UnlockBabyDialog
+        baby={toUnlock}
+        onClose={() => setToUnlock(null)}
+        onUnlock={async (password) => {
+          if (!toUnlock) return false;
+          const ok = await unlock(toUnlock.id, password);
+          if (ok) {
+            setToUnlock(null);
+            close();
+          }
+          return ok;
+        }}
+      />
 
       <DeleteBabyDialog
         baby={toDelete}
