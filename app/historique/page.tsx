@@ -12,7 +12,7 @@ import {
   getDeviceTz,
   kindEmoji,
 } from "@/lib/format";
-import type { Bottle, NewBottle } from "@/lib/types";
+import type { Bottle, BottleInput } from "@/lib/types";
 
 export default function HistoriquePage() {
   const { bottles, loading, edit, remove } = useBottles();
@@ -23,7 +23,7 @@ export default function HistoriquePage() {
 
   const groups = useMemo(() => groupByDay(bottles, tz), [bottles, tz]);
 
-  async function handleSave(input: NewBottle) {
+  async function handleSave(input: BottleInput) {
     if (!editing) return;
     setSaving(true);
     try {

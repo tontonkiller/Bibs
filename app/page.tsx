@@ -5,7 +5,7 @@ import { BottleSheet } from "@/components/BottleSheet";
 import { useBottles } from "@/components/BottlesProvider";
 import { dayBucket, dayTotals } from "@/lib/day";
 import { getDeviceTz, lastFeedSentence } from "@/lib/format";
-import type { NewBottle } from "@/lib/types";
+import type { BottleInput } from "@/lib/types";
 
 export default function HomePage() {
   const { bottles, loading, error, pending, add } = useBottles();
@@ -22,7 +22,7 @@ export default function HomePage() {
     return { ml: totals.ml, min: totals.min, last: lastForToday ?? null };
   }, [bottles, tz]);
 
-  async function handleSave(input: NewBottle) {
+  async function handleSave(input: BottleInput) {
     setSaving(true);
     try {
       await add(input);

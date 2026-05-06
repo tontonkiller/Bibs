@@ -24,6 +24,7 @@ function bottle(drunkAtIso: string, opts: BottleOpts = {}): Bottle {
     opts.duration === undefined ? (kind === "breast" ? 15 : null) : opts.duration;
   return {
     id: opts.id ?? drunkAtIso,
+    baby_id: "test-baby",
     drunk_at: drunkAtIso,
     kind,
     amount_ml: amount,

@@ -6,11 +6,12 @@ import { enqueue } from "./offlineQueue";
 
 const TABLE = "bottles";
 
-export async function listBottles(): Promise<Bottle[]> {
+export async function listBottles(babyId: string): Promise<Bottle[]> {
   const sb = getSupabase();
   const { data, error } = await sb
     .from(TABLE)
     .select("*")
+    .eq("baby_id", babyId)
     .order("drunk_at", { ascending: false })
     .limit(2000);
   if (error) throw error;
@@ -23,6 +24,7 @@ export async function createBottle(input: NewBottle): Promise<Bottle | null> {
     const { data, error } = await sb
       .from(TABLE)
       .insert({
+        baby_id: input.baby_id,
         drunk_at: input.drunk_at,
         kind: input.kind,
         amount_ml: input.amount_ml,

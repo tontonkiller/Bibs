@@ -6,13 +6,13 @@ import { DurationSlider } from "./DurationSlider";
 import { KindToggle } from "./KindToggle";
 import { TimeField } from "./TimeField";
 import { fromLocalInputValue, toLocalInputValue } from "@/lib/format";
-import type { Bottle, FeedKind, NewBottle } from "@/lib/types";
+import type { Bottle, BottleInput, FeedKind } from "@/lib/types";
 
 type Props = {
   open: boolean;
   initial?: Bottle | null;
   onClose: () => void;
-  onSave: (input: NewBottle) => Promise<void> | void;
+  onSave: (input: BottleInput) => Promise<void> | void;
   saving?: boolean;
 };
 
