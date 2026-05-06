@@ -1,3 +1,5 @@
+import type { Bottle, FeedKind } from "./types";
+
 const TIME_FMT = new Intl.DateTimeFormat("fr-CA", {
   hour: "2-digit",
   minute: "2-digit",
@@ -15,11 +17,9 @@ export function formatTime(iso: string): string {
 }
 
 export function formatDayLabel(dayKey: string): string {
-  // dayKey is YYYY-MM-DD already in target tz; build a Date at noon to avoid TZ drift
   const [y, m, d] = dayKey.split("-").map((s) => parseInt(s, 10));
   const date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   const label = DATE_LONG_FMT.format(date);
-  // Capitalize first letter of weekday
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -35,8 +35,6 @@ export function getDeviceTz(): string {
   }
 }
 
-// Convert a Date to the value expected by <input type="datetime-local">
-// (YYYY-MM-DDTHH:mm in local tz, no seconds).
 export function toLocalInputValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
@@ -45,12 +43,36 @@ export function toLocalInputValue(date: Date): string {
   );
 }
 
-// Parse a "YYYY-MM-DDTHH:mm" local-time string back into an ISO string in UTC.
 export function fromLocalInputValue(local: string): string {
-  // Treat as local time of the device.
   const [datePart, timePart] = local.split("T");
   const [y, m, d] = datePart.split("-").map((s) => parseInt(s, 10));
   const [hh, mm] = timePart.split(":").map((s) => parseInt(s, 10));
   const date = new Date(y, m - 1, d, hh, mm, 0, 0);
   return date.toISOString();
+}
+
+const KIND_EMOJI: Record<FeedKind, string> = {
+  formula: "🍼",
+  breast: "🤱",
+  pumped: "🥛",
+};
+
+export function kindEmoji(kind: FeedKind): string {
+  return KIND_EMOJI[kind];
+}
+
+// Compact display: "90 ml", "15 min", "90 ml" depending on kind.
+export function feedAmountText(b: Bottle): string {
+  if (b.kind === "breast") return `${b.duration_min ?? 0} min`;
+  return `${b.amount_ml ?? 0} ml`;
+}
+
+// "Dernier : 90 ml à 03h12" or "Dernière tétée : 15 min à 03h12"
+export function lastFeedSentence(b: Bottle): string {
+  const time = formatTime(b.drunk_at);
+  if (b.kind === "breast") {
+    return `Dernière tétée : ${b.duration_min ?? 0} min à ${time}`;
+  }
+  const noun = b.kind === "pumped" ? "biberon (tiré)" : "biberon";
+  return `Dernier ${noun} : ${b.amount_ml ?? 0} ml à ${time}`;
 }

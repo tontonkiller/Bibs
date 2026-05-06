@@ -52,7 +52,9 @@ export async function drainQueue(): Promise<{ ok: number; failed: number }> {
       if (op.kind === "create") {
         const { error } = await sb.from("bottles").insert({
           drunk_at: op.payload.drunk_at,
+          kind: op.payload.kind,
           amount_ml: op.payload.amount_ml,
+          duration_min: op.payload.duration_min,
           note: op.payload.note ?? null,
         });
         if (error) throw error;

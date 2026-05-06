@@ -1,12 +1,14 @@
--- Bibs — schéma DB
--- À exécuter dans le SQL editor de Supabase une seule fois.
+-- Bibs — schéma DB (état final, pour fresh install)
+-- Si tu as déjà exécuté schema.sql v1, applique plutôt migrations/002_kinds_and_duration.sql.
 
 create extension if not exists "pgcrypto";
 
 create table if not exists public.bottles (
   id uuid primary key default gen_random_uuid(),
   drunk_at timestamptz not null,
-  amount_ml integer not null check (amount_ml between 0 and 210),
+  kind text not null default 'formula' check (kind in ('formula','breast','pumped')),
+  amount_ml integer check (amount_ml between 0 and 210),
+  duration_min integer check (duration_min is null or duration_min between 0 and 60),
   note text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

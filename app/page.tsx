@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { BottleSheet } from "@/components/BottleSheet";
 import { useBottles } from "@/components/BottlesProvider";
-import { dayBucket, totalForDay } from "@/lib/day";
-import { formatTime, getDeviceTz } from "@/lib/format";
+import { dayBucket, dayTotals } from "@/lib/day";
+import { getDeviceTz, lastFeedSentence } from "@/lib/format";
 import type { NewBottle } from "@/lib/types";
 
 export default function HomePage() {
@@ -13,13 +13,13 @@ export default function HomePage() {
   const [saving, setSaving] = useState(false);
   const tz = getDeviceTz();
 
-  const { todayMl, last } = useMemo(() => {
+  const { ml, min, last } = useMemo(() => {
     const today = dayBucket(new Date(), tz);
-    const ml = totalForDay(bottles, today, tz);
+    const totals = dayTotals(bottles, today, tz);
     const lastForToday = bottles.find(
       (b) => dayBucket(b.drunk_at, tz) === today,
     );
-    return { todayMl: ml, last: lastForToday ?? null };
+    return { ml: totals.ml, min: totals.min, last: lastForToday ?? null };
   }, [bottles, tz]);
 
   async function handleSave(input: NewBottle) {
@@ -43,13 +43,18 @@ export default function HomePage() {
       <section className="rounded-3xl bg-(--color-surface) p-6 shadow-sm">
         <div className="flex items-baseline gap-2">
           <span className="text-7xl font-bold tabular-nums text-(--color-ink)">
-            {todayMl}
+            {ml}
           </span>
           <span className="text-2xl text-(--color-ink-soft)">ml</span>
         </div>
+        {min > 0 && (
+          <p className="mt-1 text-base text-(--color-ink-soft)">
+            + {min} min de tétée
+          </p>
+        )}
         <p className="mt-2 text-sm text-(--color-ink-soft)">
           {last
-            ? `Dernier : ${last.amount_ml} ml à ${formatTime(last.drunk_at)}`
+            ? lastFeedSentence(last)
             : loading
               ? "Chargement…"
               : "Aucun biberon aujourd'hui"}

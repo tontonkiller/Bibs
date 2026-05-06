@@ -5,7 +5,13 @@ import { BottleSheet } from "@/components/BottleSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useBottles } from "@/components/BottlesProvider";
 import { groupByDay } from "@/lib/day";
-import { formatDayLabel, formatTime, getDeviceTz } from "@/lib/format";
+import {
+  feedAmountText,
+  formatDayLabel,
+  formatTime,
+  getDeviceTz,
+  kindEmoji,
+} from "@/lib/format";
 import type { Bottle, NewBottle } from "@/lib/types";
 
 export default function HistoriquePage() {
@@ -57,7 +63,9 @@ export default function HistoriquePage() {
                 {formatDayLabel(g.day)}
               </h2>
               <span className="text-sm tabular-nums text-(--color-ink-soft)">
-                {g.totalMl} ml · {g.bottles.length} bib
+                {g.totalMl} ml
+                {g.totalMin > 0 ? ` · ${g.totalMin} min` : ""} ·{" "}
+                {g.bottles.length} bib
               </span>
             </div>
             <ul className="mt-3 flex flex-col gap-1">
@@ -70,7 +78,10 @@ export default function HistoriquePage() {
                   >
                     <div>
                       <div className="text-base font-medium tabular-nums">
-                        {b.amount_ml} ml
+                        <span className="mr-1" aria-hidden>
+                          {kindEmoji(b.kind)}
+                        </span>
+                        {feedAmountText(b)}
                       </div>
                       {b.note && (
                         <div className="text-xs text-(--color-ink-soft)">
@@ -105,7 +116,7 @@ export default function HistoriquePage() {
           }}
           className="fixed bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-full bg-(--color-surface) px-5 py-2 text-sm font-medium text-(--color-rose-strong) shadow-lg"
         >
-          Supprimer ce biberon
+          Supprimer
         </button>
       )}
 
